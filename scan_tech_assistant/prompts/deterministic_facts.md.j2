@@ -1,0 +1,7 @@
+<deterministic_facts>
+Ground truth — do not contradict or regenerate any of this.
+{{ facts_json }}
+{% if unresolved_includes %}
+Could not resolve these include() references — you were not given their contents: {{ unresolved_includes | join(', ') }}
+{% endif %}
+</deterministic_facts>
