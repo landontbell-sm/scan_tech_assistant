@@ -1,0 +1,4 @@
+**/plugin_index.json
+**/__pycache__
+venv
+.env

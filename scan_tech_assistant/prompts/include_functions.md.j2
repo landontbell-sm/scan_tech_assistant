@@ -1,0 +1,13 @@
+<include_functions>
+{% if functions %}
+Functions the plugin body calls directly, extracted from the plugin's own include() files:
+{% for fn in functions %}
+
+<function name="{{ fn.name }}" file="{{ fn.file }}">
+{{ fn.body }}
+</function>
+{% endfor %}
+{% else %}
+None of the functions the plugin body calls are defined in its include() files.
+{% endif %}
+</include_functions>

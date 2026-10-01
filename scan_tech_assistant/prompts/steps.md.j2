@@ -3,10 +3,14 @@
 
 {% endif %}
 {% for step in steps %}
-### Step {{ step.order }}: {{ step.title }}
+### Step {{ loop.index }}: {{ step.title }}
 {{ step.explanation }}
 {% if step.command %}
-*({{ "plugin's own payload" if step.payload_origin == "plugin" else "model-designed payload" }})*
+{% if step.payload_origin == "plugin" %}
+*(plugin's own payload)*
+{% elif step.payload_origin == "model_designed" %}
+*(model-designed payload)*
+{% endif %}
 ```bash
 {{ step.command }}
 ```

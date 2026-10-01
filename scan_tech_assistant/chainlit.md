@@ -8,6 +8,6 @@ The assistant will:
 
 1. Locate the plugin's source
 2. Pull out its CVEs, severity, and false-positive signals
-3. Read the trigger logic and explain what it checks, what
+3. Read the trigger logic and explain what it checks, what 
    response makes it fire, and why it might have failed
 4. Generate test commands the agent can manually edit/run to validate the claims.

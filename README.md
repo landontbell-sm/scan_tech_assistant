@@ -25,20 +25,43 @@ docker build -t scan_tech_assistant:latest apps/scan_tech_assistant
 
 The following environment variables can be set to configure the app:
 
-| Variable            | Description                                                | Default           |
-| ------------------- | ---------------------------------------------------------- | ----------------- |
-| `ANTHROPIC_API_KEY` | API key used to call the Claude API.                       | _(empty)_         |
-| `MODEL`             | The Claude model to use for generating testing procedures. | `claude-sonnet-5` |
+| Variable             | Description                                             | Default          |
+| -------------------- | --------------------------------------------------------- | ----------------- |
+| `ANTHROPIC_API_KEY`  | API key used to call the Claude API.                     | _(empty)_        |
+| `MODEL`              | The Claude model to use for generating testing procedures. | `claude-sonnet-5-5` |
 
 ## Usage
 
-Run the container with your API key set:
+### Build and run from this repo
+
+From the repo root (where the `Dockerfile` is):
 
 ```bash
-docker run -d -p 8000:8000 -e ANTHROPIC_API_KEY="your-api-key" scan_tech_assistant:latest
+# 1. Build the image (first build downloads the plugin archive and indexes it;
+#    later builds that only change app code reuse those layers)
+docker build -t scan_tech_assistant:latest .
+
+# 2. Load a fresh API key into this shell without echoing it or saving it to history
+read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY
+
+# 3. Start the container. `-e ANTHROPIC_API_KEY` with no value passes the variable
+#    through from your shell, so the key never appears in the command line or `docker ps`
+docker run -d --name scan_tech_assistant -p 8000:8000 -e ANTHROPIC_API_KEY scan_tech_assistant:latest
+
+# 4. Open http://localhost:8000 and enter a numeric Nessus plugin ID
 ```
 
-Once running, open the app in a browser and enter a numeric Nessus plugin
-ID. The app will look up the plugin's NASL source, summarize the finding,
-and walk through a testing procedure the tech can run by hand to validate
-the finding.
+Useful follow-ups:
+
+```bash
+docker logs -f scan_tech_assistant                 # watch startup and request errors
+docker rm -f scan_tech_assistant                   # stop and remove before re-running
+docker run ... -e MODEL=claude-sonnet-5 ...        # override the default model
+```
+
+To pick up code changes: `docker rm -f scan_tech_assistant`, rebuild (step 1),
+and run again (step 3). The key stays loaded in the same shell session.
+
+Once running, the app looks up the plugin's NASL source, summarizes the
+finding, and walks through a testing procedure the tech can run by hand to
+validate the finding.
