@@ -1,0 +1,1 @@
+**Scan Agent:** Enter a Nessus plugin ID and I'll walk through how to verify the finding by hand. Afterwards, ask follow-up questions, for example to fix a command that didn't work or to get the next one.

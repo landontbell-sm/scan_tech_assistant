@@ -61,7 +61,3 @@ docker run ... -e MODEL=claude-sonnet-5 ...        # override the default model
 
 To pick up code changes: `docker rm -f scan_tech_assistant`, rebuild (step 1),
 and run again (step 3). The key stays loaded in the same shell session.
-
-Once running, the app looks up the plugin's NASL source, summarizes the
-finding, and walks through a testing procedure the tech can run by hand to
-validate the finding.

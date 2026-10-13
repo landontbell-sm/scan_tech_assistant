@@ -1,6 +1,6 @@
-FROM python:3.14-slim
+FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1
-# Resolve scan_tech_assistant imports to the source tree (where prompts/ and plugin_index.json live)
+# Resolve scan_tech_assistant imports to the source tree (where the prompts, templates and plugin_index.json live)
 ENV PYTHONPATH=/app
 
 WORKDIR /app

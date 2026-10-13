@@ -1,0 +1,13 @@
+{% if name %}
+## {{ name }}
+{% endif %}
+Plugin {{ plugin_id }}{% if risk_factor %} · Risk: **{{ risk_factor }}**{% endif %}
+
+{% if description %}
+
+{{ description }}
+{% endif %}
+{% if solution %}
+
+**Solution:** {{ solution }}
+{% endif %}
