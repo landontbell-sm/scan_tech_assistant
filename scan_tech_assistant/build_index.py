@@ -5,9 +5,9 @@ import subprocess
 import sys
 from functools import lru_cache
 from pathlib import Path
-from scan_tech_assistant.nasl_regex import INCLUDE_REGEX, SCRIPT_ID_REGEX
+from scan_tech_assistant.nasl_regex import SCRIPT_ID_REGEX
 
-INDEX_PATH = Path(__file__).parent / "plugin_index.json"
+INDEX_PATH = "plugin_index.json"
 
 
 def index_plugins(plugin_dir: str):

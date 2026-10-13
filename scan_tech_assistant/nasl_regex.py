@@ -1,131 +1,42 @@
 """Regular expressions and parsing helpers for Nessus NASL scripts."""
 
 import re
+from dataclasses import dataclass, field
 from typing import Callable
-from pydantic import BaseModel, Field
 
+# NASL double-quoted strings are pure: no escape sequences, so they can't contain a '"'
 SCRIPT_ID_REGEX = re.compile(r"script_id\(\s*(\d+)\s*\)")
-SCRIPT_VERSION_REGEX = re.compile(r'script_version\(\s*"([^"]+)"\s*\)')
-CVE_ID_ARGS_REGEX = re.compile(r"script_cve_id\((.*?)\)", re.DOTALL)
-QUOTED_STRING_REGEX = re.compile(r'"([^"]*)"')
-SCRIPT_NAME_REGEX = re.compile(r'script_name\(\s*(\w+)\s*:\s*"((?:[^"\\]|\\.)*)"')
-SCRIPT_FAMILY_REGEX = re.compile(r'script_family\(\s*english\s*:\s*"((?:[^"\\]|\\.)*)"')
-CVSS_VECTOR_REGEX = re.compile(
-    r'script_set_cvss(\d*)_(base|temporal)_vector\(\s*"([^"]+)"\s*\)'
+SCRIPT_NAME_REGEX = re.compile(
+    r"""script_name\(\s*(\w+)\s*:\s*(?:"([^"]*)"|'((?:[^'\\]|\\.)*)')"""
+)
+# Older plugins assign the name first: name["english"] = "..."; script_name(english:name["english"]);
+NAME_VAR_REGEX = re.compile(r'\bname\[\s*["\']english["\']\s*\]\s*=\s*"([^"]*)"')
+ATTRIBUTE_TEMPLATE = (
+    r'script_set_attribute\(\s*attribute\s*:\s*"{name}"\s*,\s*value\s*:\s*"([^"]*)"\s*\)\s*;'
 )
 PLUGIN_ID_RE = re.compile(r"^\s*(\d+)\s*$")
 INCLUDE_REGEX = re.compile(r"""include\(\s*['"]([^'"]+\.inc)['"]\s*\)""")
-ATTRIBUTE_TEMPLATE = (
-    r'script_set_attribute\(\s*attribute\s*:\s*"{name}"\s*,\s*value\s*:\s*'
-    r'"((?:[^"\\]|\\.)*)"\s*\)\s*;'
-)
 CALL_REGEX = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
-FUNCTION_DEF_TEMPLATE = r"^[ \t]*function\s+{name}\s*\("
+FUNCTION_DEF_TEMPLATE = r"^[ \t]*(?:(?:public|private)[ \t]+)?function\s+{name}\s*\("
 NASL_KEYWORDS = frozenset(
     {"if", "while", "for", "foreach", "return", "function", "include", "else", "repeat", "until"}
 )
 MAX_FUNCTION_CHARS = 4000
 
 
-class PluginDetails(BaseModel):
-    """Represents the details of a Nessus plugin."""
+@dataclass
+class PluginDetails:
+    """The plugin metadata shown in the UI summary and used to scope web_fetch."""
 
-    plugin_id: str | None = None
-    version: str | None = None
     name: str | None = None
-    family: str | None = None
     risk_factor: str | None = None
-    cves: list[str] = Field(default_factory=list)
-    cvss_vectors: dict[str, str] = Field(default_factory=dict)
-    synopsis: str | None = None
     description: str | None = None
     solution: str | None = None
-    see_also: list[str] = Field(default_factory=list)
+    see_also: list[str] = field(default_factory=list)
 
 
-def parse_script_id(content: str) -> str | None:
-    """Parses the script_id from the given NASL content."""
-    match = SCRIPT_ID_REGEX.search(content)
-    return match.group(1) if match else None
-
-
-def parse_version(content: str) -> str | None:
-    """Parses the script_version from the given NASL content."""
-    match = SCRIPT_VERSION_REGEX.search(content)
-    return match.group(1) if match else None
-
-
-def parse_cves(content: str) -> list[str]:
-    """Parses the CVE IDs from the given NASL content."""
-    match = CVE_ID_ARGS_REGEX.search(content)
-    if not match:
-        return []
-    return QUOTED_STRING_REGEX.findall(match.group(1))
-
-
-def parse_name(content: str) -> str | None:
-    """Parses the script_name from the given NASL content."""
-    matches = SCRIPT_NAME_REGEX.findall(content)
-    if not matches:
-        return None
-    for lang, text in matches:
-        if lang.lower() == "english":
-            return text
-    return matches[0][1]
-
-
-def parse_attribute(content: str, name: str) -> str | None:
-    """Parses a specific script_set_attribute from the given NASL content."""
-    pattern = re.compile(ATTRIBUTE_TEMPLATE.format(name=re.escape(name)), re.DOTALL)
-    match = pattern.search(content)
-    return match.group(1) if match else None
-
-
-def parse_see_also(content: str) -> list[str]:
-    """Parses the script_set_attribute for 'see_also' from the given NASL content."""
-    pattern = re.compile(ATTRIBUTE_TEMPLATE.format(name="see_also"), re.DOTALL)
-    return pattern.findall(content)
-
-
-def parse_family(content: str) -> str | None:
-    """Parses the script_family from the given NASL content."""
-    match = SCRIPT_FAMILY_REGEX.search(content)
-    return match.group(1) if match else None
-
-
-def parse_cvss_vectors(content: str) -> dict[str, str]:
-    """Parses the CVSS vectors from the given NASL content."""
-    vectors: dict[str, str] = {}
-    for version, kind, vector in CVSS_VECTOR_REGEX.findall(content):
-        vectors[f"cvss{version or '2'}_{kind}"] = vector
-    return vectors
-
-
-def parse(content: str) -> PluginDetails:
-    """Parses the given NASL content and returns a PluginDetails object."""
-    return PluginDetails(
-        plugin_id=parse_script_id(content),
-        version=parse_version(content),
-        name=parse_name(content),
-        family=parse_family(content),
-        risk_factor=parse_attribute(content, "risk_factor"),
-        cves=parse_cves(content),
-        cvss_vectors=parse_cvss_vectors(content),
-        synopsis=parse_attribute(content, "synopsis"),
-        description=parse_attribute(content, "description"),
-        solution=parse_attribute(content, "solution"),
-        see_also=parse_see_also(content),
-    )
-
-
-def parse_file(path: str) -> PluginDetails:
-    """Parses the given NASL file and returns a PluginDetails object."""
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        content = f.read()
-    return parse(content)
-
-
-class IncludeFunction(BaseModel):
+@dataclass
+class IncludeFunction:
     """A function body extracted from one of the plugin's direct includes."""
 
     name: str
@@ -133,9 +44,38 @@ class IncludeFunction(BaseModel):
     body: str
 
 
-def called_names(content: str) -> set[str]:
-    """Returns the names of everything the given NASL content calls, minus NASL keywords."""
-    return {name for name in CALL_REGEX.findall(content) if name not in NASL_KEYWORDS}
+def parse_name(content: str) -> str | None:
+    """Parses the script_name from the given NASL content, preferring the English one."""
+    names = [(lang, double or single) for lang, double, single in SCRIPT_NAME_REGEX.findall(content)]
+    for lang, text in names:
+        if lang.lower() == "english":
+            return text
+    if match := NAME_VAR_REGEX.search(content):
+        return match.group(1)
+    return names[0][1] if names else None
+
+
+def parse_attributes(content: str, name: str) -> list[str]:
+    """Parses every value of the named script_set_attribute from the given NASL content."""
+    pattern = re.compile(ATTRIBUTE_TEMPLATE.format(name=re.escape(name)))
+    return pattern.findall(content)
+
+
+def parse_attribute(content: str, name: str) -> str | None:
+    """Parses the first value of the named script_set_attribute, or None."""
+    values = parse_attributes(content, name)
+    return values[0] if values else None
+
+
+def parse(content: str) -> PluginDetails:
+    """Parses the given NASL content and returns a PluginDetails object."""
+    return PluginDetails(
+        name=parse_name(content),
+        risk_factor=parse_attribute(content, "risk_factor"),
+        description=parse_attribute(content, "description"),
+        solution=parse_attribute(content, "solution"),
+        see_also=parse_attributes(content, "see_also"),
+    )
 
 
 def resolve_direct_includes(
@@ -162,7 +102,6 @@ def _code_chars(source: str, start: int):
     while i < n:
         c = source[i]
         if c == '"':
-            # NASL double-quoted strings have no escape sequences
             end = source.find('"', i + 1)
             if end == -1:
                 return
@@ -181,6 +120,24 @@ def _code_chars(source: str, start: int):
         else:
             yield i, c
             i += 1
+
+
+def called_names(content: str) -> set[str]:
+    """
+    Returns the names of everything the given NASL content calls, ignoring strings,
+    comments and NASL keywords.
+    """
+    code = []
+    last = -1
+    for i, c in _code_chars(content, 0):
+        if i != last + 1:
+            # Keep tokens on either side of a removed string or comment apart
+            code.append(" ")
+        code.append(c)
+        last = i
+    return {
+        name for name in CALL_REGEX.findall("".join(code)) if name not in NASL_KEYWORDS
+    }
 
 
 def extract_function(source: str, name: str) -> str | None:
