@@ -1,1 +1,0 @@
-**Placeholders:** `<TARGET>` is the address from the finding. For web findings, that's the base URL with scheme and port, e.g. `https://10.0.0.5:8443`. For other services, it's the host. `<PORT>` is the port from the finding.

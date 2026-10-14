@@ -2,20 +2,4 @@
 {{ plugin_source }}
 </plugin_source>
 
-{% if functions %}
-<include_functions>
-These are functions from the plugin's include files that the plugin calls directly. Only one level was loaded, so functions these call aren't here. A body ending in `# [truncated: ...]` was cut off at that point.
-{% for fn in functions %}
-
-<function name="{{ fn.name }}" file="{{ fn.file }}">
-{{ fn.body }}
-</function>
-{% endfor %}
-</include_functions>
-
-{% endif %}
-{% if unresolved_includes %}
-These include files couldn't be found, so you don't have their contents: {{ unresolved_includes | join(', ') }}
-
-{% endif %}
 I'm checking a finding from plugin {{ plugin_id }}. How do I verify it?

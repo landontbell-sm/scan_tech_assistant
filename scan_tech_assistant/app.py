@@ -5,8 +5,8 @@ import chainlit as cl
 from anthropic import AsyncAnthropic
 from anthropic.types import WebFetchTool20260209Param
 from jinja2 import Environment, FileSystemLoader
-from scan_tech_assistant.build_index import find_include, find_plugin
-from scan_tech_assistant.nasl_regex import PLUGIN_ID_RE, extract_include_functions, parse, resolve_direct_includes
+from scan_tech_assistant.build_index import find_plugin
+from scan_tech_assistant.nasl_regex import PLUGIN_ID_RE, parse
 
 client = AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 MODEL = os.environ.get("MODEL", "claude-sonnet-5-5")
@@ -36,7 +36,13 @@ async def stream_response(model: str, messages: list, answer: cl.Message):
     async with client.messages.stream(
         model=model,
         max_tokens=20000,
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        system=[
+            {
+                "type": "text",
+                "text": SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
         tools=[WEB_FETCH],
         thinking={"type": "adaptive"},
         output_config={"effort": "medium"},
@@ -73,7 +79,9 @@ async def stream_turn(model: str, messages: list, answer: cl.Message):
     if response.stop_reason == "refusal":
         raise Refusal(f"{model} declined to answer: {response.stop_details}")
     if response.stop_reason != "end_turn" or not answer.content:
-        raise RuntimeError(f"Claude stopped without answering ({response.stop_reason}). Try again.")
+        raise RuntimeError(
+            f"Claude stopped without answering ({response.stop_reason}). Try again."
+        )
 
 
 async def run_turn(chat: dict) -> cl.Message:
@@ -91,7 +99,7 @@ async def run_turn(chat: dict) -> cl.Message:
             await stream_turn(chat["model"], messages, answer)
             return answer
         except Exception as e:
-            del messages[user_turn + 1:]
+            del messages[user_turn + 1 :]
             if answer.content:
                 await answer.remove()
             if isinstance(e, Refusal) and chat["model"] != FALLBACK_MODEL:
@@ -131,7 +139,9 @@ async def main(message: cl.Message):
 async def start_plugin(match):
     """Shows the plugin's summary and source, then asks Claude how to verify the finding."""
     if not match:
-        await cl.Message(content="Start by entering a Nessus plugin ID (a number).").send()
+        await cl.Message(
+            content="Start by entering a Nessus plugin ID (a number)."
+        ).send()
         return
     plugin_id = match.group(1)
     plugin_path = find_plugin(plugin_id)
@@ -141,19 +151,20 @@ async def start_plugin(match):
 
     with open(plugin_path, encoding="utf-8", errors="replace") as f:
         source = f.read()
-    summary = render("templates/plugin_summary.md.j2", plugin_id=plugin_id, plugin=parse(source))
+    summary = render(
+        "templates/plugin_summary.md.j2", plugin_id=plugin_id, plugin=parse(source)
+    )
     await cl.Message(content=summary).send()
-    async with cl.Step(name=os.path.basename(plugin_path), type="tool", language="nasl") as step:
+    async with cl.Step(
+        name=os.path.basename(plugin_path), type="tool", language="nasl"
+    ) as step:
         step.output = source
 
-    include_paths, unresolved_includes = resolve_direct_includes(source, find_include)
     prompt = render(
         "prompts/plugin.md.j2",
         plugin_id=plugin_id,
         plugin_path=plugin_path,
         plugin_source=source,
-        functions=extract_include_functions(source, include_paths),
-        unresolved_includes=unresolved_includes,
     )
     chat = {
         "plugin_id": plugin_id,
@@ -161,11 +172,16 @@ async def start_plugin(match):
         "messages": [
             {
                 "role": "user",
-                "content": [{"type": "text", "text": prompt, "cache_control": {"type": "ephemeral"}}],
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
             }
         ],
     }
     answer = await run_turn(chat)
-    await answer.stream_token()
     await answer.send()
     cl.user_session.set("chat", chat)
